@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS Devices (
 CREATE TABLE IF NOT EXISTS QuizQuestions (
     QuestionID INT AUTO_INCREMENT PRIMARY KEY,
     QuestionText TEXT NOT NULL,
-    CorrectAnswer CHAR(1) NOT NULL
+    CorrectAnswer CHAR(1) NOT NULL,
+    IsActive BOOLEAN NOT NULL
 );
 
 -- QuizResponses 테이블 생성

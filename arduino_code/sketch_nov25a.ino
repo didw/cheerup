@@ -43,8 +43,7 @@ void setup_wifi() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
-  // Generate client ID from MAC address
-  clientId = "ESP8266Client-" + WiFi.macAddress();
+  clientId = WiFi.macAddress();
 }
 
 void reconnect() {
@@ -54,12 +53,40 @@ void reconnect() {
     if (client.connect(clientId.c_str(), "jyyang", "didwhdduf")) {
       Serial.println("connected");
       // MQTT 연결 성공 시 수행할 작업
+      client.subscribe(clientId.c_str());
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       delay(5000);
     }
+  }
+}
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+
+  // 클라이언트의 고유 토픽 확인
+  if (String(topic) == clientId) {
+    if ((char)payload[0] == '1') {
+      blinkLed(ledPin1, 3);
+    } else if ((char)payload[0] == '2') {
+      blinkLed(ledPin2, 3);
+    }
+  }
+}
+
+void blinkLed(int ledPin, int times) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(ledPin, HIGH);
+    delay(250);
+    digitalWrite(ledPin, LOW);
+    delay(250);
   }
 }
 
@@ -71,6 +98,7 @@ void setup() {
   pinMode(ledPin2, OUTPUT);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
 
   // Initialize the button states based on the current readings
   stableButtonState1 = digitalRead(buttonPin1);
@@ -125,3 +153,4 @@ void loop() {
   lastButtonState1 = reading1;
   lastButtonState2 = reading2;
 }
+
