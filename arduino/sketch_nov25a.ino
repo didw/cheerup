@@ -2,18 +2,22 @@
 #include <PubSubClient.h>
 
 // WiFi 설정
-const char* ssid = "B-2002";
-const char* password = "25802580";
+const char* ssid = "AndroidHotspot7896";
+const char* password = "22222222";
 
 // MQTT 서버 설정
-const char* mqtt_server = "192.168.1.2";
+const char* mqtt_server = "52.79.239.104";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 // 버튼 핀 설정
-const int buttonPin1 = 4;
-const int buttonPin2 = 5;
+const int buttonPin1 = 5;
+const int buttonPin2 = 4;
+
+// LED 핀 설정
+const int ledPin1 = 13;
+const int ledPin2 = 15;
 
 // 디바운싱에 필요한 변수들
 unsigned long lastDebounceTime1 = 0;  
@@ -61,8 +65,10 @@ void reconnect() {
 
 void setup() {
   Serial.begin(9600);
-  pinMode(buttonPin1, INPUT);
-  pinMode(buttonPin2, INPUT);
+  pinMode(buttonPin1, INPUT_PULLUP);
+  pinMode(buttonPin2, INPUT_PULLUP);
+  pinMode(ledPin1, OUTPUT);
+  pinMode(ledPin2, OUTPUT);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
 
@@ -81,6 +87,10 @@ void loop() {
 
   bool reading1 = digitalRead(buttonPin1);
   bool reading2 = digitalRead(buttonPin2);
+
+  // LED 제어
+  digitalWrite(ledPin1, !reading1); // 버튼 1 상태에 따라 LED 1 제어
+  digitalWrite(ledPin2, !reading2); // 버튼 2 상태에 따라 LED 2 제어
 
   if (reading1 != lastButtonState1) {
     lastDebounceTime1 = millis();
@@ -111,7 +121,7 @@ void loop() {
       }
     }
   }
-  
+
   lastButtonState1 = reading1;
   lastButtonState2 = reading2;
 }
