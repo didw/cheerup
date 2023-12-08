@@ -1,6 +1,7 @@
 # admin_interface/app.py
 import streamlit as st
 import requests
+from mqtt_client.send_command import send_command_to_device
 
 API_BASE_URL = "http://localhost:5000/api"
 
@@ -51,27 +52,23 @@ def manage_quiz():
                 else:
                     st.error("퀴즈 삭제에 실패했습니다.")
 
-# admin_interface/app.py 내의 view_responses 함수
 def view_responses():
     st.subheader("퀴즈 응답 조회")
     quiz_id = st.selectbox("퀴즈 선택", options=get_quiz_ids())
     if quiz_id:
         if st.button("결과 조회"):
-            # 선택한 퀴즈에 대한 응답 결과 요청
             responses = requests.get(f"{API_BASE_URL}/quiz/responses/{quiz_id}").json()
             correct_responses = [resp for resp in responses if resp['is_correct']]
             correct_count = len(correct_responses)
             total_count = len(responses)
 
-            # 결과 표시
             st.write(f"정답률: {correct_count / total_count * 100:.2f}% ({correct_count}/{total_count})")
             for response in correct_responses:
                 st.write(f"Device {response['device_id']} - 정답")
 
-            # 정답 디바이스에게 명령어 보내기
             if st.button("정답 디바이스에게 명령어 보내기"):
                 for device_id in [resp['device_id'] for resp in correct_responses]:
-                    requests.post(f"{API_BASE_URL}/devices/command/{device_id}", json={"command": "some_command"})
+                    send_command_to_device(device_id, "some_command")
 
 # admin_interface/app.py 내의 get_quiz_ids 함수
 def get_quiz_ids():
@@ -115,7 +112,21 @@ def main():
     choice = st.sidebar.selectbox("메뉴", menu)
 
     if choice == "홈":
-        st.write("환영합니다!")
+        st.header("환영합니다!")
+        st.write("""
+        ### 퀴즈 시스템 관리자 대시보드 사용 방법
+
+        - **퀴즈 관리**: 새로운 퀴즈를 추가하거나 기존 퀴즈를 수정 및 삭제할 수 있습니다.
+            - '새 퀴즈 추가'를 클릭하여 새로운 퀴즈를 추가할 수 있습니다.
+            - 각 퀴즈 옆의 '수정' 및 '삭제' 버튼을 사용하여 퀴즈를 관리할 수 있습니다.
+
+        - **퀴즈 응답 조회**: 각 퀴즈에 대한 응답을 조회하고, 퀴즈의 정답률을 확인할 수 있습니다.
+            - 드롭다운 메뉴에서 퀴즈를 선택한 후 '결과 조회' 버튼을 클릭합니다.
+            - 정답을 맞춘 디바이스에 추가 명령어를 보낼 수 있습니다.
+
+        - **장비 관리**: 연결된 모든 장비의 상태를 확인하고, 장비를 제어할 수 있습니다.
+            - 각 장비의 상태를 확인할 수 있으며, '재설정' 버튼으로 장비를 초기화할 수 있습니다.
+        """)
     elif choice == "퀴즈 관리":
         add_quiz()
         manage_quiz()
