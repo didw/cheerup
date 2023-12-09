@@ -1,6 +1,19 @@
 # admin_interface/app.py
+import sys
+import os
+import time
 import streamlit as st
 import requests
+
+# 현재 스크립트의 디렉토리 경로를 구합니다.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 프로젝트의 루트 디렉토리 경로를 구합니다.
+project_root = os.path.dirname(current_dir)
+
+# 프로젝트 루트 디렉토리를 sys.path에 추가합니다.
+sys.path.append(project_root)
+
 from mqtt_client.send_command import send_command_to_device
 
 API_BASE_URL = "http://localhost:5000/api"
@@ -32,10 +45,14 @@ def manage_quiz():
     st.subheader("퀴즈 관리")
     quizzes = get_quizzes()
 
-    for i, quiz in enumerate(quizzes, start=1):
+    for i, quiz in enumerate(quizzes):
+        print(quiz)
         with st.expander(f"ID: {quiz['id']} - 문제: {quiz['question_text']}"):
             updated_text = st.text_area(f"문제 수정 {i}", value=quiz['question_text'])
-            updated_answer = st.selectbox(f"정답 수정 {i}", ["A", "B", "C", "D"], index=["A", "B", "C", "D"].index(quiz['correct_answer']), key=f"answer_{i}")
+            if quiz['correct_answer'] in ["O", "X"]:
+                updated_answer = st.selectbox(f"정답 수정 {i}", ["O", "X"], index=["O", "X"].index(quiz['correct_answer']), key=f"answer_{i}")
+            else:
+                updated_answer = st.selectbox(f"정답 수정 {i}", ["A", "B", "C", "D"], index=["A", "B", "C", "D"].index(quiz['correct_answer']), key=f"answer_{i}")
             if st.button(f"ID {quiz['id']} 수정", key=f"update_{i}"):
                 response = requests.put(f"{API_BASE_URL}/quiz/{quiz['id']}", json={
                     "question_text": updated_text,
@@ -51,6 +68,35 @@ def manage_quiz():
                     st.success("퀴즈가 삭제되었습니다.")
                 else:
                     st.error("퀴즈 삭제에 실패했습니다.")
+
+def start_quiz():
+    st.subheader("퀴즈 시작")
+    quiz_id = st.selectbox("퀴즈 선택", options=get_quiz_ids())
+    quiz_duration = st.number_input("퀴즈 지속 시간 (초)", min_value=5, max_value=300, value=60)
+
+    if st.button("퀴즈 시작"):
+        # Flask API로 퀴즈 활성화 요청
+        requests.post(f"{API_BASE_URL}/quiz/activate/{quiz_id}")
+
+        # 카운트다운 시작
+        with st.empty():
+            for remaining in range(quiz_duration, 0, -1):
+                st.write(f"{remaining}초 남음")
+                time.sleep(1)
+            st.write("응답 마감!")
+
+        # 퀴즈 결과 요청 및 표시
+        results = requests.get(f"{API_BASE_URL}/quiz/results/{quiz_id}").json()
+        correct_count = results['correct_count']
+        incorrect_count = results['incorrect_count']
+
+        st.write("### 퀴즈 결과")
+        st.write(f"정답 개수: {correct_count}")
+        st.write(f"오답 개수: {incorrect_count}")
+
+        # 결과 애니메이션 표시 (Streamlit은 직접적인 애니메이션 지원이 제한적임)
+        # 대체 방안으로 Streamlit 컴포넌트 라이브러리 사용 가능
+
 
 def view_responses():
     st.subheader("퀴즈 응답 조회")
@@ -75,7 +121,7 @@ def get_quiz_ids():
     response = requests.get(f"{API_BASE_URL}/quiz")
     if response.status_code == 200:
         quizzes = response.json()
-        return [quiz['id'] for quiz in quizzes]
+        return [quiz[0] for quiz in quizzes]
     else:
         st.error("퀴즈 정보를 가져오는 데 실패했습니다.")
         return []
@@ -84,7 +130,9 @@ def get_quiz_ids():
 def get_quizzes():
     response = requests.get(f"{API_BASE_URL}/quiz")
     if response.status_code == 200:
-        return response.json()
+        res = response.json()
+        res = [{'id': quiz[0], 'question_text': quiz[1], 'correct_answer': quiz[2]} for quiz in res]
+        return res
     else:
         st.error("퀴즈 정보를 가져오는 데 실패했습니다.")
         return []
@@ -97,10 +145,10 @@ def manage_devices():
 
     if devices:
         for device in devices:
-            st.write(f"Device ID: {device['id']}, 상태: {device['status']}")
-            if st.button(f"Device {device['id']} 재설정"):
+            st.write(f"Device ID: {device[0].strip()}, 상태: {device[1]}")
+            if st.button(f"Device {device[0].strip()} 재설정"):
                 # 장비 재설정을 위한 API 호출
-                requests.post(f"{API_BASE_URL}/devices/reset/{device['id']}")
+                requests.post(f"{API_BASE_URL}/devices/reset/{device[0]}")
     else:
         st.write("등록된 장비가 없습니다.")
 
@@ -108,7 +156,7 @@ def manage_devices():
 def main():
     st.title("퀴즈 시스템 관리자 대시보드")
 
-    menu = ["홈", "퀴즈 관리", "퀴즈 응답 조회", "장비 관리"]
+    menu = ["홈", "퀴즈 시작", "퀴즈 관리", "퀴즈 응답 조회", "장비 관리"]
     choice = st.sidebar.selectbox("메뉴", menu)
 
     if choice == "홈":
@@ -127,6 +175,8 @@ def main():
         - **장비 관리**: 연결된 모든 장비의 상태를 확인하고, 장비를 제어할 수 있습니다.
             - 각 장비의 상태를 확인할 수 있으며, '재설정' 버튼으로 장비를 초기화할 수 있습니다.
         """)
+    elif choice == "퀴즈 시작":
+        start_quiz()
     elif choice == "퀴즈 관리":
         add_quiz()
         manage_quiz()
