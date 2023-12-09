@@ -13,10 +13,10 @@ def get_current_question_id():
     connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_DATABASE)
     try:
         with connection.cursor() as cursor:
-            sql = "SELECT QuestionID FROM QuizQuestions WHERE IsActive = TRUE"
+            sql = "SELECT QuestionID FROM QuizQuestions WHERE IsActive = 1"
             cursor.execute(sql)
             result = cursor.fetchone()
-            return result['QuestionID'] if result else None
+            return result[0] if result else None
     finally:
         connection.close()
 
@@ -36,7 +36,7 @@ def store_quiz_response(mac_address, device_status):
         with create_db_connection() as connection:
             with connection.cursor() as cursor:
                 sql = "INSERT INTO QuizResponses (DeviceID, QuestionID, SelectedAnswer) VALUES (%s, %s, %s)"
-                selected_answer = 'A' if device_status == "Button 1 Pressed" else 'B'
+                selected_answer = 'O' if device_status == "Button 1 Pressed" else 'X'
                 cursor.execute(sql, (mac_address, current_question_id, selected_answer))
                 connection.commit()
 
@@ -49,12 +49,15 @@ def on_message(client, userdata, msg):
     print(msg.topic + " " + message)
 
     mac_address, device_status = message.split(' ', 1)
+    mac_address = mac_address.strip()
 
     try:
         if device_status == "Connected":
+            print(f"Device {mac_address} connected.")
             update_device_status(mac_address, device_status)
         elif device_status in ["Button 1 Pressed", "Button 2 Pressed"]:
             store_quiz_response(mac_address, device_status)
+            update_device_status(mac_address, device_status)
     except Exception as e:
         print(f"Error: {e}")
 

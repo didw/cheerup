@@ -1,4 +1,4 @@
-# flask_app/send_command.py
+# mqtt_client/send_command.py
 import paho.mqtt.publish as publish
 
 MQTT_SERVER = "127.0.0.1"
