@@ -56,7 +56,8 @@ def configure_routes(app):
         data = request.json
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("UPDATE QuizQuestions SET QuestionText = %s, CorrectAnswer = %s WHERE id = %s",
+        print(quiz_id, data)
+        cursor.execute("UPDATE QuizQuestions SET QuestionText = %s, CorrectAnswer = %s WHERE QuestionID = %s",
                     (data['question_text'], data['correct_answer'], quiz_id))
         db.commit()
         return {"message": "Quiz updated successfully"}, 200
@@ -112,3 +113,43 @@ def configure_routes(app):
         # 장비에 명령어를 보내는 로직
         # 예: MQTT 또는 다른 프로토콜을 사용하여 장비에 명령어 전송
         return {"message": f"Command sent to device {device_id}"}, 200
+
+
+    @app.route('/api/quiz/activate/<int:quiz_id>', methods=['POST'])
+    def activate_quiz(quiz_id):
+        db = get_db()
+        cursor = db.cursor()
+        try:
+            cursor.execute("UPDATE QuizQuestions SET IsActive = TRUE WHERE QuestionID = %s", (quiz_id,))
+            db.commit()
+            return {"message": "Quiz activated"}, 200
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+    @app.route('/api/quiz/results/<int:quiz_id>', methods=['GET'])
+    def get_quiz_results(quiz_id):
+        db = get_db()
+        cursor = db.cursor()
+        try:
+            # 정답 개수 계산
+            cursor.execute("""
+                SELECT COUNT(*) AS correct_count
+                FROM QuizResponses
+                JOIN QuizQuestions ON QuizResponses.QuestionID = QuizQuestions.QuestionID
+                WHERE QuizResponses.QuestionID = %s AND QuizResponses.SelectedAnswer = QuizQuestions.CorrectAnswer
+            """, (quiz_id,))
+            correct_count = cursor.fetchone()['correct_count']
+
+            # 오답 개수 계산
+            cursor.execute("""
+                SELECT COUNT(*) AS incorrect_count
+                FROM QuizResponses
+                JOIN QuizQuestions ON QuizResponses.QuestionID = QuizQuestions.QuestionID
+                WHERE QuizResponses.QuestionID = %s AND QuizResponses.SelectedAnswer != QuizQuestions.CorrectAnswer
+            """, (quiz_id,))
+            incorrect_count = cursor.fetchone()['incorrect_count']
+
+            return jsonify({"correct_count": correct_count, "incorrect_count": incorrect_count})
+        except Exception as e:
+            return {"error": str(e)}, 500
+        
