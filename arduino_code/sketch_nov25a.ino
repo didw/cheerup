@@ -30,6 +30,17 @@ bool stableButtonState2 = LOW;
 
 String clientId;
 
+// Function to strip characters from a string
+String rstrip(String str) {
+  if (str.length() == 0) return str;
+
+  int i = str.length() - 1;
+  while (i >= 0 && (str[i] == ' ' || str[i] == '\t' || str[i] == '\n' || str[i] == '\r')) {
+    i--;
+  }
+  return str.substring(0, i + 1);
+}
+
 void setup_wifi() {
   delay(10);
   Serial.println("Connecting to WiFi...");
@@ -44,6 +55,7 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 
   clientId = WiFi.macAddress();
+  clientId = rstrip(clientId); // Strip the clientId
 }
 
 void reconnect() {
@@ -52,7 +64,11 @@ void reconnect() {
     // Use the clientId in the connect call
     if (client.connect(clientId.c_str(), "jyyang", "didwhdduf")) {
       Serial.println("connected");
+
       // MQTT 연결 성공 시 수행할 작업
+      String connectMessage = clientId + " Connected";
+      client.publish("buttonTopic", connectMessage.c_str());
+
       client.subscribe(clientId.c_str());
     } else {
       Serial.print("failed, rc=");
